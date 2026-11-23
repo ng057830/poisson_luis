@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Distribución de Poisson — Sucesos por Intervalo (Sesión 7)</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous" onload="initMath()"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge-top">Sesión 7 · Apuntes Interactivos para Luis · Estadística</div>
+      <h1>Distribución de Poisson: Sucesos por Intervalo</h1>
+      <p class="subtitle">
+        Relaciona tasa \(r\), duración \(t\) y parámetro \(\lambda = r \cdot t\) para modelar \(X \sim \text{Poisson}(\lambda)\) y contrastarlo con datos reales.
+      </p>
+
+      <nav class="toggle-wrapper" role="tablist" aria-label="Secciones del aplicativo">
+        <button class="toggle-btn active" data-tab="sim" role="tab" aria-selected="true">Simulador de Intervalos</button>
+        <button class="toggle-btn" data-tab="practice" role="tab" aria-selected="false">Ejercicio Aplicado</button>
+        <button class="toggle-btn" data-tab="theory" role="tab" aria-selected="false">Teoría (Binomial → Poisson)</button>
+        <button class="toggle-btn" data-tab="data" role="tab" aria-selected="false">Datos Ficha 7 (100 CSV)</button>
+        <button class="toggle-btn" data-tab="quiz" role="tab" aria-selected="false">Practica (Quiz)</button>
+      </nav>
+    </header>
+
+    <!-- ==========================================
+         PESTAÑA 1: SIMULADOR DE INTERVALOS
+         ========================================== -->
+    <section id="view-sim" class="view active">
+      <!-- Selector rápido de escenario -->
+      <div class="scenario-bar">
+        <span class="scenario-label">Escenario activo:</span>
+        <div class="scenario-pills">
+          <button class="scenario-btn active" data-scenario="ficha7">📞 Ficha 7: Centralita (\(r=3/min, t=2\))</button>
+          <button class="scenario-btn" data-scenario="cafe">☕ Práctica: Cafetería (\(r=2.5/min, t=2\))</button>
+          <button class="scenario-btn" data-scenario="server">🖥️ Breve: Servidor (\(r=2/h, t=0.5\))</button>
+        </div>
+      </div>
+
+      <!-- Enunciado rápido del escenario -->
+      <div class="enunciado-banner" id="sim-enunciado"></div>
+
+      <div class="action-panel">
+        <div class="panel-group">
+          <label for="sim-amount" class="sr-only">Cantidad de intervalos a simular</label>
+          <select id="sim-amount">
+            <option value="1">Simular 1 intervalo (paso a paso)</option>
+            <option value="10">Simular 10 intervalos</option>
+            <option value="50">Simular 50 intervalos</option>
+            <option value="100" selected>Simular 100 intervalos</option>
+            <option value="1000">Simular 1000 intervalos</option>
+          </select>
+          <label for="sim-speed" class="sr-only">Velocidad de animación</label>
+          <select id="sim-speed" title="Velocidad de la animación">
+            <option value="slow">Velocidad: Lenta</option>
+            <option value="normal" selected>Velocidad: Normal</option>
+            <option value="fast">Velocidad: Rápida</option>
+          </select>
+          <button class="btn btn-main" id="btn-sim-run">▶ Simular Intervalos</button>
+          <button class="btn btn-danger" id="btn-sim-stop" hidden>⏹ Detener</button>
+        </div>
+        <div class="panel-group">
+          <button class="btn btn-clear" id="btn-sim-reset">Limpiar</button>
+        </div>
+      </div>
+
+      <!-- Parámetros ajustables -->
+      <div class="params-card">
+        <div class="param-item">
+          <div class="param-header">
+            <label for="input-r">Tasa de ocurrencia (<strong>\(r\)</strong> por unidad)</label>
+            <span class="param-val" id="val-r">3.0 / min</span>
+          </div>
+          <input type="range" id="input-r" min="0.5" max="6" step="0.5" value="3">
+        </div>
+
+        <div class="param-item">
+          <div class="param-header">
+            <label for="input-t">Duración del intervalo (<strong>\(t\)</strong>)</label>
+            <span class="param-val" id="val-t">2.0 min</span>
+          </div>
+          <input type="range" id="input-t" min="0.5" max="5" step="0.5" value="2">
+        </div>
+
+        <div class="param-item">
+          <div class="param-header">
+            <label for="input-k">Condición de interés (\(\lambda = r \cdot t = \) <strong id="val-lambda-inline">6</strong>)</label>
+            <span class="param-val" id="val-cond-label">X = 5</span>
+          </div>
+          <div class="cond-controls">
+            <select id="input-op">
+              <option value="eq" selected>Exactamente (X = k)</option>
+              <option value="le">Como máximo (X ≤ k)</option>
+              <option value="ge">Al menos (X ≥ k)</option>
+            </select>
+            <input type="number" id="input-k" min="0" max="25" value="5" aria-label="Valor de k">
+          </div>
+        </div>
+      </div>
+
+      <!-- Escenario visual: línea de tiempo del intervalo [0, t] -->
+      <div class="stage">
+        <div class="stage-header">
+          <span class="stage-label" id="stage-interval-title">Intervalo en observación \([0, t]\)</span>
+          <span class="lot-badge" id="interval-status-badge">Esperando simulación...</span>
+        </div>
+
+        <div class="sim-progress-wrap" id="sim-progress-wrap" hidden>
+          <div class="sim-progress-track">
+            <div class="sim-progress-bar" id="sim-progress-bar"></div>
+          </div>
+          <span class="sim-progress-text" id="sim-progress-text">0 / 0 intervalos</span>
+        </div>
+
+        <div class="timeline-box">
+          <div class="timeline-axis">
+            <span>0</span>
+            <span id="tl-mid">1.0</span>
+            <span id="tl-end">2.0 min</span>
+          </div>
+          <div class="timeline-track" id="timeline-track" aria-live="polite">
+            <div class="timeline-sweep" id="timeline-sweep"></div>
+          </div>
+          <div class="events-counter-row" id="events-chips"></div>
+        </div>
+
+        <div class="lot-summary" id="interval-summary">
+          Pulsa <strong>Simular Intervalos</strong> para ver llegar los sucesos en el intervalo de tiempo.
+        </div>
+
+        <div class="lot-history-wrap" id="interval-history-wrap" hidden>
+          <div class="lot-history-label">Últimos intervalos simulados:</div>
+          <div class="lot-history" id="interval-history"></div>
+        </div>
+      </div>
+
+      <!-- Tarjetas de resumen -->
+      <div class="results-grid">
+        <div class="card c-blue">
+          <h3>📐 Modelo Poisson(\(\lambda\))</h3>
+          <div class="big-number" id="theo-prob">16.06 %</div>
+          <p class="card-desc" id="theo-formula-desc">P(X = 5) con λ = 6.00</p>
+          <div class="mini-stats">
+            <div><span>Esperanza \(\operatorname{E}[X] = \lambda\):</span> <strong id="theo-mean">6.00</strong></div>
+            <div><span>Varianza \(\operatorname{Var}(X) = \lambda\):</span> <strong id="theo-var">6.00</strong></div>
+          </div>
+        </div>
+
+        <div class="card c-green">
+          <h3>🧪 Tu Simulación</h3>
+          <div class="big-number" id="sim-prob">—</div>
+          <p class="card-desc" id="sim-count-desc">0 intervalos cumplen la condición de 0 simulados</p>
+          <div class="mini-stats">
+            <div><span>Media simulada \(\bar{x}\):</span> <strong id="sim-mean">—</strong></div>
+            <div><span>Tasa estimada \(\hat{r} = \bar{x}/t\):</span> <strong id="sim-rhat">—</strong></div>
+          </div>
+        </div>
+
+        <div class="card c-purple">
+          <h3>📋 Referencia Ficha 7 (CSV)</h3>
+          <div class="big-number">13.00 %</div>
+          <p class="card-desc">13 de 100 intervalos tuvieron exactamente 5 llamadas</p>
+          <div class="mini-stats">
+            <div><span>Media muestral \(\bar{x}\):</span> <strong>5.76 (576 / 100)</strong></div>
+            <div><span>Tasa observada \(\hat{r}\):</span> <strong>2.880 / min</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráfico comparativo -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <h3>Distribución de Poisson \(P(X=k)\) vs. Frecuencia Simulada</h3>
+            <p class="chart-sub">Pasa el ratón o toca cada barra para ver los valores exactos.</p>
+          </div>
+          <label class="checkbox-pill">
+            <input type="checkbox" id="toggle-real-overlay" checked>
+            <span>Mostrar 100 registros Ficha 7</span>
+          </label>
+        </div>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="dot dot-theo"></span> Teórica Poisson(\(\lambda\))</span>
+          <span class="legend-item"><span class="dot dot-sim"></span> Simulada (tu experimento)</span>
+          <span class="legend-item" id="legend-real"><span class="dot dot-real"></span> Observada (Ficha 7 CSV)</span>
+        </div>
+        <div class="chart-wrapper" id="sim-chart-wrapper"></div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         PESTAÑA 2: EJERCICIO APLICADO PASO A PASO
+         ========================================== -->
+    <section id="view-practice" class="view">
+      <div class="theory-container">
+        <div class="practice-hero">
+          <div class="practice-tag">Ejercicio de Práctica Aplicada · Para resolver ya</div>
+          <h2>☕ Pedidos en hora punta en una cafetería de especialidad</h2>
+          <p>
+            <strong>Enunciado:</strong> Una cafetería recibe pedidos a través de su app móvil de forma independiente y a una tasa constante de <strong>\(r = 2.5\) pedidos por minuto</strong>.
+            Durante un tramo de <strong>\(t = 2\) minutos</strong> en hora punta:
+          </p>
+          <ol class="clean-list">
+            <li>¿Cuál es la probabilidad de recibir <strong>exactamente 3 pedidos</strong>?</li>
+            <li>¿Cuál es la probabilidad de recibir <strong>como máximo 2 pedidos</strong>?</li>
+          </ol>
+          <button class="btn btn-main" id="btn-load-cafe" style="margin-top:0.5rem;">▶ Cargar este ejercicio en el Simulador</button>
+        </div>
+
+        <article class="theory-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <h2>Definición de variables</h2>
+            <ul class="clean-list">
+              <li><strong>Variable aleatoria:</strong> \(X = \text{número de pedidos recibidos en un intervalo de } 2 \text{ minutos}\).</li>
+              <li><strong>Valores posibles:</strong> \(X \in \{0, 1, 2, 3, \ldots\}\) (variable discreta de conteo).</li>
+              <li><strong>Tasa unitaria:</strong> \(r = 2.5 \text{ pedidos/minuto}\).</li>
+              <li><strong>Duración del intervalo:</strong> \(t = 2 \text{ minutos}\).</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="theory-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <h2>Planteo y ajuste del parámetro \(\lambda\)</h2>
+            <p>Antes de aplicar la fórmula de Poisson, <strong>siempre</strong> ajustamos la tasa a la duración del intervalo:</p>
+            <div class="math-box highlight">
+              \[ \lambda = r \cdot t = 2.5 \times 2 = 5 \text{ pedidos esperados en 2 minutos} \]
+            </div>
+            <p>Por tanto, nuestro modelo es:</p>
+            <div class="math-box">
+              \[ X \sim \text{Poisson}(\lambda = 5), \qquad P(X = k) = \frac{e^{-5}\, 5^k}{k!} \]
+            </div>
+            <p class="note-muted">Además, \(\operatorname{E}[X] = 5\) pedidos y \(\operatorname{Var}(X) = 5\).</p>
+          </div>
+        </article>
+
+        <article class="theory-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <h2>Resolución paso a paso</h2>
+            <p><strong>Parte A: Exactamente 3 pedidos (\(X = 3\))</strong></p>
+            <div class="math-box">
+              \[ P(X = 3) = \frac{e^{-5} \cdot 5^3}{3!} = \frac{e^{-5} \cdot 125}{6} \approx 0.1404 \]
+            </div>
+            <p>Es decir, aproximadamente un <strong>14.04 %</strong> de probabilidad.</p>
+
+            <p style="margin-top:1rem;"><strong>Parte B: Como máximo 2 pedidos (\(X \le 2\))</strong></p>
+            <div class="math-box">
+              \[ P(X \le 2) = P(X=0) + P(X=1) + P(X=2) \]
+              \[ = e^{-5}\left(\frac{5^0}{0!} + \frac{5^1}{1!} + \frac{5^2}{2!}\right) = e^{-5}\left(1 + 5 + 12.5\right) = 18.5\,e^{-5} \approx 0.1247 \]
+            </div>
+            <div class="final-banner" style="margin-top:0.75rem;">
+              <div class="final-banner-label">Resultados del ejercicio</div>
+              <div class="final-banner-num">\(P(X=3) \approx 14.04\%\) · \(P(X \le 2) \approx 12.47\%\)</div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         PESTAÑA 3: TEORÍA (BINOMIAL -> POISSON)
+         ========================================== -->
+    <section id="view-theory" class="view">
+      <div class="theory-container">
+        <div class="theory-callout">
+          <strong>Idea clave de la Sesión 7:</strong> En la sesión anterior contábamos éxitos en \(n\) piezas fijas (Binomial). Ahora contamos sucesos en un intervalo de tiempo o espacio, donde no hay un número fijo de ensayos previos.
+        </div>
+
+        <article class="theory-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <h2>Tasa por tiempo y parámetro \(\lambda = r \cdot t\)</h2>
+            <p>Si \(r\) es la tasa por minuto y \(t\) la duración del intervalo, el número esperado de sucesos es \(\lambda = rt\). En un proceso homogéneo con incrementos independientes:</p>
+            <div class="math-box highlight">
+              \[ P(X = k) = \frac{e^{-\lambda}\lambda^k}{k!}, \qquad k = 0, 1, 2, \ldots \]
+            </div>
+            <p>Para \(r = 3\) llamadas/minuto y \(t = 2\) minutos, \(\lambda = 3 \times 2 = 6\). <strong>La tasa 3 no se puede usar sin ajustar el intervalo.</strong></p>
+          </div>
+        </article>
+
+        <article class="theory-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <h2>Deducción desde sucesos raros (Límite Binomial → Poisson)</h2>
+            <p>Dividimos el intervalo en \(m\) subintervalos muy pequeños e independientes, cada uno con probabilidad \(p = \lambda / m\):</p>
+            <div class="math-box">
+              \[ \binom{m}{k}\left(\frac{\lambda}{m}\right)^k \left(1 - \frac{\lambda}{m}\right)^{m-k} \xrightarrow{m \to \infty} \frac{\lambda^k}{k!}e^{-\lambda} \]
+            </div>
+            <p class="note-muted">Prueba mover \(m\) para ver cómo la Binomial \(B(m, p = \lambda/m)\) converge a Poisson(\(\lambda = 6\)) para \(k = 5\):</p>
+
+            <div class="k-explorer">
+              <div class="k-explorer-top">
+                <label for="explorer-m">Subdivisiones del intervalo (<strong>\(m\)</strong>):</label>
+                <input type="range" id="explorer-m" min="10" max="500" step="10" value="30">
+                <span class="param-val" id="explorer-m-val">m = 30</span>
+              </div>
+              <div class="k-explorer-result" id="explorer-m-result"></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="theory-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <h2>Por qué media y varianza coinciden</h2>
+            <p>En una distribución de Poisson, tanto la esperanza como la varianza son iguales a \(\lambda\):</p>
+            <div class="two-cols">
+              <div class="math-box highlight">
+                <div class="box-title">Esperanza matemática</div>
+                \[ \operatorname{E}[X] = e^{-\lambda}\sum_{k=1}^{\infty}\frac{k\lambda^k}{k!} = \lambda \]
+              </div>
+              <div class="math-box highlight">
+                <div class="box-title">Varianza</div>
+                \[ \operatorname{Var}(X) = \operatorname{E}[X(X-1)] + \operatorname{E}[X] - (\operatorname{E}[X])^2 = \lambda \]
+              </div>
+            </div>
+            <p class="note-muted"><strong>Condiciones:</strong> un cambio de tasa por horario o sucesos agrupados rompe el modelo homogéneo. Además, en una muestra finita de 100 observaciones no tienen por qué ser exactamente iguales la media y la varianza.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         PESTAÑA 4: DATOS REALES (CSV FICHA 7)
+         ========================================== -->
+    <section id="view-data" class="view">
+      <div class="data-intro-card">
+        <div>
+          <h2>Práctica con los 100 registros de la Ficha 7</h2>
+          <p>
+            Cada fila de <code>sesion_07_datos.csv</code> representa un intervalo independiente de 2 minutos (\(100 \times 2 = 200\) minutos totales).
+            En los primeros 5 registros (IDs 1–5: 3, 7, 6, 8, 6) suman 30 llamadas en 10 minutos (\(\bar{x}=6\), \(\hat{r}=3\)).
+          </p>
+        </div>
+        <button class="btn btn-main" id="btn-download-csv">⬇ Descargar sesion_07_datos.csv</button>
+      </div>
+
+      <div class="comparison-hero">
+        <div class="comp-box comp-theo">
+          <div class="comp-label">Modelo teórico (\(P(X=5)\))</div>
+          <div class="comp-value">16.06 %</div>
+          <div class="comp-sub">Poisson(\(\lambda = 6\))</div>
+        </div>
+        <div class="comp-vs">vs</div>
+        <div class="comp-box comp-obs">
+          <div class="comp-label">Frecuencia observada (CSV)</div>
+          <div class="comp-value">13.00 %</div>
+          <div class="comp-sub">13 de 100 intervalos tuvieron 5 llamadas</div>
+        </div>
+      </div>
+
+      <div class="data-grid">
+        <div class="table-card">
+          <h3>Tabla de frecuencias de los 100 intervalos</h3>
+          <table class="freq-table">
+            <thead>
+              <tr>
+                <th>Llamadas \(k\)</th>
+                <th>Observados</th>
+                <th>Frec. relativa</th>
+                <th>Esperado Poisson(6)</th>
+              </tr>
+            </thead>
+            <tbody id="csv-freq-tbody"></tbody>
+            <tfoot>
+              <tr>
+                <td><strong>Total</strong></td>
+                <td><strong>100</strong></td>
+                <td><strong>100 %</strong></td>
+                <td><strong>576 llamadas</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="phat-card">
+          <h3>Estimaciones de la muestra</h3>
+          <div class="math-box highlight">
+            \[ \bar{x} = \frac{576}{100} = 5.760 \text{ llamadas/intervalo} \]
+          </div>
+          <div class="math-box highlight">
+            \[ \hat{r} = \frac{576}{200 \text{ min}} = 2.880 \text{ llamadas/minuto} \]
+          </div>
+          <p>
+            <strong>Dispersión muestral:</strong> la varianza muestral (con divisor \(n-1=99\)) es <strong>\(s^2 = 6.528\)</strong>, que comparamos descriptivamente con la media \(\bar{x} = 5.760\).
+          </p>
+          <p class="note-muted">
+            El parámetro teórico \(\lambda = 6\) describe el mecanismo generador; la muestra finita de 100 intervalos presenta variaciones naturales alrededor de ese valor.
+          </p>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <h3>Comparativa Visual: Poisson(\(\lambda=6\)) vs. 100 Registros del CSV</h3>
+            <p class="chart-sub">La barra resaltada corresponde a \(X = 5\) llamadas.</p>
+          </div>
+          <label class="checkbox-pill">
+            <input type="checkbox" id="toggle-lhat-overlay" checked>
+            <span>Mostrar Poisson(\(\hat{\lambda} = 5.76\))</span>
+          </label>
+        </div>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="dot dot-theo"></span> Teórica (\(\lambda=6\))</span>
+          <span class="legend-item"><span class="dot dot-real"></span> Observada (100 registros CSV)</span>
+          <span class="legend-item" id="legend-lhat"><span class="dot dot-phat"></span> Ajustada (\(\hat{\lambda}=5.76\))</span>
+        </div>
+        <div class="chart-wrapper" id="data-chart-wrapper"></div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         PESTAÑA 5: QUIZ DE REPASO
+         ========================================== -->
+    <section id="view-quiz" class="view">
+      <div class="quiz-container">
+        <div class="quiz-header">
+          <div>
+            <h2>Repaso rápido (Sesión 7)</h2>
+            <p>Comprueba los conceptos clave de Poisson, tasa, duración y varianza.</p>
+          </div>
+          <div class="quiz-score-pill" id="quiz-score">Puntuación: 0 / 5</div>
+        </div>
+        <div id="quiz-list"></div>
+        <div class="quiz-actions">
+          <button class="btn btn-secondary" id="btn-quiz-reset">Reiniciar cuestionario</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="chart-tooltip" class="chart-tooltip" hidden></div>
+  <script src="script.js"></script>
+</body>
+</html>
